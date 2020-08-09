@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	vnc "github.com/amitbet/vnc2video"
+	"github.com/amitbet/vnc2video/encoders"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"net"
@@ -10,11 +12,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
-	"strconv"
 	"syscall"
 	"time"
-	vnc "github.com/amitbet/vnc2video"
-	"github.com/amitbet/vnc2video/encoders"
 )
 
 func init() {
@@ -186,7 +185,7 @@ func recorder(c *cli.Context) error {
 		syscall.SIGHUP,
 		syscall.SIGINT,
 		syscall.SIGTERM,
-		syscall.SIGQUIT, )
+		syscall.SIGQUIT)
 	frameBufferReq := 0
 	timeStart := time.Now()
 
