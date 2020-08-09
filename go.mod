@@ -1,6 +1,6 @@
 module github.com/saily/vnc-recorder
 
-go 1.14
+go 1.13
 
 require (
 	github.com/amitbet/vnc2video v0.0.0-20190616012314-9d50b9dab1d9
