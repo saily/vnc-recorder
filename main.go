@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	vnc "github.com/amitbet/vnc2video"
+	"github.com/amitbet/vnc2video/encoders"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"net"
@@ -10,11 +12,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
-	"strconv"
 	"syscall"
 	"time"
-	vnc "github.com/amitbet/vnc2video"
-	"github.com/amitbet/vnc2video/encoders"
 )
 
 func init() {
@@ -94,17 +93,24 @@ func recorder(c *cli.Context) error {
 	cchClient := make(chan vnc.ClientMessage)
 	errorCh := make(chan error)
 
-	ccfg := &vnc.ClientConfig{
-		SecurityHandlers: []vnc.SecurityHandler{
-			// &vnc.ClientAuthATEN{Username: []byte(os.Args[2]), Password: []byte(os.Args[3])}
-			&vnc.ClientAuthVNC{Password: []byte(c.String("password"))},
+	var secHandlers []vnc.SecurityHandler
+	if c.String("password") == "" {
+		secHandlers = []vnc.SecurityHandler{
 			&vnc.ClientAuthNone{},
-		},
-		DrawCursor:      true,
-		PixelFormat:     vnc.PixelFormat32bit,
-		ClientMessageCh: cchClient,
-		ServerMessageCh: cchServer,
-		Messages:        vnc.DefaultServerMessages,
+		}
+	} else {
+		secHandlers = []vnc.SecurityHandler{
+			&vnc.ClientAuthVNC{Password: []byte(c.String("password"))},
+		}
+	}
+
+	ccfg := &vnc.ClientConfig{
+		SecurityHandlers: secHandlers,
+		DrawCursor:       true,
+		PixelFormat:      vnc.PixelFormat32bit,
+		ClientMessageCh:  cchClient,
+		ServerMessageCh:  cchServer,
+		Messages:         vnc.DefaultServerMessages,
 		Encodings: []vnc.Encoding{
 			&vnc.RawEncoding{},
 			&vnc.TightEncoding{},
@@ -133,24 +139,13 @@ func recorder(c *cli.Context) error {
 		panic(err)
 	}
 	log.Infof("Using %s for encoding", ffmpeg_path)
-	vcodec := &encoders.Encoder{
-		BinPath:   ffmpeg_path,
-		Framerate: c.Int("framerate"),
-		Cmd: exec.Command(ffmpeg_path,
-			"-f", "image2pipe",
-			"-vcodec", "ppm",
-			"-r", strconv.Itoa(c.Int("framerate")),
-			"-an", // no audio
-			"-y",
-			"-i", "-",
-			"-vcodec", "libx264", //"libvpx",//"libvpx-vp9"//"libx264"
-			"-preset", "fast",
-			"-crf", "24",
-			c.String("outfile"),
-		),
+	vcodec := &encoders.X264ImageEncoder{
+		FFMpegBinPath: ffmpeg_path,
+		Framerate:     c.Int("framerate"),
 	}
 
-	go vcodec.Run()
+	//goland:noinspection GoUnhandledErrorResult
+	go vcodec.Run(c.String("outfile"))
 
 	for _, enc := range ccfg.Encodings {
 		myRenderer, ok := enc.(vnc.Renderer)
@@ -190,7 +185,7 @@ func recorder(c *cli.Context) error {
 		syscall.SIGHUP,
 		syscall.SIGINT,
 		syscall.SIGTERM,
-		syscall.SIGQUIT, )
+		syscall.SIGQUIT)
 	frameBufferReq := 0
 	timeStart := time.Now()
 
