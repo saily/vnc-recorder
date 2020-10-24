@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	vnc "github.com/amitbet/vnc2video"
-	"github.com/amitbet/vnc2video/encoders"
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 	"net"
@@ -141,7 +140,7 @@ func recorder(c *cli.Context) error {
 		panic(err)
 	}
 	log.Infof("Using %s for encoding", ffmpeg_path)
-	vcodec := &encoders.X264ImageEncoder{
+	vcodec := &X264ImageCustomEncoder{
 		FFMpegBinPath: ffmpeg_path,
 		Framerate:     c.Int("framerate"),
 	}
@@ -182,12 +181,16 @@ func recorder(c *cli.Context) error {
 		}
 	}()
 
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc,
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh,
+		os.Interrupt,
 		syscall.SIGHUP,
 		syscall.SIGINT,
 		syscall.SIGTERM,
-		syscall.SIGQUIT)
+		syscall.SIGQUIT,
+		syscall.SIGKILL,
+	)
+
 	frameBufferReq := 0
 	timeStart := time.Now()
 
@@ -202,22 +205,18 @@ func recorder(c *cli.Context) error {
 				secsPassed := time.Now().Sub(timeStart).Seconds()
 				frameBufferReq++
 				reqPerSec := float64(frameBufferReq) / secsPassed
-				//counter++
-				//jpeg.Encode(out, screenImage, nil)
-				///vcodec.Encode(screenImage)
 				log.Debugf("reqs=%d, seconds=%f, Req Per second= %f", frameBufferReq, secsPassed, reqPerSec)
 
 				reqMsg := vnc.FramebufferUpdateRequest{Inc: 1, X: 0, Y: 0, Width: cc.Width(), Height: cc.Height()}
-				//cc.ResetAllEncodings()
 				reqMsg.Write(cc)
 			}
-		case signal := <-sigc:
+		case signal := <-sigCh:
 			if signal != nil {
 				log.Info(signal, " received, exit.")
 				vcodec.Close()
 				// give some time to write the file
-				time.Sleep(time.Second * 5)
-				return nil
+				time.Sleep(time.Second * 1)
+				os.Exit(0)
 			}
 		}
 	}
