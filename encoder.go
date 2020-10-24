@@ -112,6 +112,7 @@ type X264ImageCustomEncoder struct {
 	input         io.WriteCloser
 	closed        bool
 	Framerate     int
+	ConstantRateFactor int
 }
 
 func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
@@ -126,10 +127,9 @@ func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
 		"-y",
 		"-i", "-",
 		"-vcodec", "libx264",
-		"-threads", "8",
 		"-preset", "veryfast",
 		"-g", "250",
-		"-crf", "37",
+		"-crf", strconv.Itoa(enc.ConstantRateFactor),
 		videoFileName,
 	)
 	cmd.Stdout = os.Stdout

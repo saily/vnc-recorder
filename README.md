@@ -32,6 +32,7 @@ library which made this wrapper possible.
        --port value       VNC port (default: 5900) [$VR_VNC_PORT]
        --password value   Password to connect to the VNC host (default: "secret") [$VR_VNC_PASSWORD]
        --framerate value  Framerate to record (default: 30) [$VR_FRAMERATE]
+       --crf value        Constant Rate Factor (CRF) to record with (default: 35) [$VR_CRF]
        --outfile value    Output file to record to. (default: "output.mp4") [$VR_OUTFILE]
        --help, -h         show help
        --version, -v      print the version

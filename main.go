@@ -64,6 +64,12 @@ func main() {
 				Usage:   "Framerate to record",
 				EnvVars: []string{"VR_FRAMERATE"},
 			},
+			&cli.IntFlag{
+				Name:    "crf",
+				Value:   35,
+				Usage:   "Constant Rate Factor (CRF) to record with",
+				EnvVars: []string{"VR_CRF"},
+			},
 			&cli.StringFlag{
 				Name:    "outfile",
 				Value:   "output.mp4",
@@ -143,6 +149,7 @@ func recorder(c *cli.Context) error {
 	vcodec := &X264ImageCustomEncoder{
 		FFMpegBinPath: ffmpeg_path,
 		Framerate:     c.Int("framerate"),
+		ConstantRateFactor: c.Int("crf"),
 	}
 
 	//goland:noinspection GoUnhandledErrorResult
