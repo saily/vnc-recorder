@@ -6,8 +6,9 @@ import (
 	vnc "github.com/amitbet/vnc2video"
 	"github.com/amitbet/vnc2video/encoders"
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"net"
+
 	"os"
 	"os/exec"
 	"os/signal"
@@ -22,53 +23,54 @@ func init() {
 }
 
 func main() {
-	app := cli.NewApp()
-	app.Name = path.Base(os.Args[0])
-	app.Usage = "Connect to a vnc server and record the screen to a video."
-	app.Version = "1.0"
-	app.Authors = []cli.Author{
-		{
-			Name:  "Daniel Widerin",
-			Email: "daniel@widerin.net",
+	app := &cli.App{
+		Name:    path.Base(os.Args[0]),
+		Usage:   "Connect to a vnc server and record the screen to a video.",
+		Version: "1.0",
+		Authors: []*cli.Author{
+			&cli.Author{
+				Name:  "Daniel Widerin",
+				Email: "daniel@widerin.net",
+			},
 		},
-	}
-	app.Action = recorder
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:   "ffmpeg",
-			Value:  "ffmpeg",
-			Usage:  "Which ffmpeg executable to use",
-			EnvVar: "VR_FFMPEG_BIN",
-		},
-		cli.StringFlag{
-			Name:   "host",
-			Value:  "localhost",
-			Usage:  "VNC host",
-			EnvVar: "VR_VNC_HOST",
-		},
-		cli.IntFlag{
-			Name:   "port",
-			Value:  5900,
-			Usage:  "VNC port",
-			EnvVar: "VR_VNC_PORT",
-		},
-		cli.StringFlag{
-			Name:   "password",
-			Value:  "secret",
-			Usage:  "Password to connect to the VNC host",
-			EnvVar: "VR_VNC_PASSWORD",
-		},
-		cli.IntFlag{
-			Name:   "framerate",
-			Value:  30,
-			Usage:  "Framerate to record",
-			EnvVar: "VR_FRAMERATE",
-		},
-		cli.StringFlag{
-			Name:   "outfile",
-			Value:  "output.mp4",
-			Usage:  "Output file to record to.",
-			EnvVar: "VR_OUTFILE",
+		Action: recorder,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "ffmpeg",
+				Value:   "ffmpeg",
+				Usage:   "Which ffmpeg executable to use",
+				EnvVars: []string{"VR_FFMPEG_BIN"},
+			},
+			&cli.StringFlag{
+				Name:    "host",
+				Value:   "localhost",
+				Usage:   "VNC host",
+				EnvVars: []string{"VR_VNC_HOST"},
+			},
+			&cli.IntFlag{
+				Name:    "port",
+				Value:   5900,
+				Usage:   "VNC port",
+				EnvVars: []string{"VR_VNC_PORT"},
+			},
+			&cli.StringFlag{
+				Name:    "password",
+				Value:   "secret",
+				Usage:   "Password to connect to the VNC host",
+				EnvVars: []string{"VR_VNC_PASSWORD"},
+			},
+			&cli.IntFlag{
+				Name:    "framerate",
+				Value:   30,
+				Usage:   "Framerate to record",
+				EnvVars: []string{"VR_FRAMERATE"},
+			},
+			&cli.StringFlag{
+				Name:    "outfile",
+				Value:   "output.mp4",
+				Usage:   "Output file to record to.",
+				EnvVars: []string{"VR_OUTFILE"},
+			},
 		},
 	}
 

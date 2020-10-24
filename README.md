@@ -8,7 +8,7 @@ library which made this wrapper possible.
 
 ## Use
 
-    docker run -it saily/vnc-recorder --help
+    docker run -it widerin/vnc-recorder --help
 
 
     NAME:
