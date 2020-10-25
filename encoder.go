@@ -143,12 +143,7 @@ func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
 }
 func (enc *X264ImageCustomEncoder) Run(videoFileName string) error {
 	if _, err := os.Stat(enc.FFMpegBinPath); os.IsNotExist(err) {
-		if _, err := os.Stat(enc.FFMpegBinPath + ".exe"); os.IsNotExist(err) {
-			log.Error("encoder file doesn't exist in path:", enc.FFMpegBinPath)
-			return errors.New("encoder file doesn't exist in path" + videoFileName)
-		} else {
-			enc.FFMpegBinPath = enc.FFMpegBinPath + ".exe"
-		}
+		return err
 	}
 
 	enc.Init(videoFileName)
