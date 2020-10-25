@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	vnc "github.com/amitbet/vnc2video"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"net"
 
@@ -75,20 +75,20 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		logrus.WithError(err).Fatal("recording failed.")
 	}
 }
 
 func recorder(c *cli.Context) error {
 	address := fmt.Sprintf("%s:%d", c.String("host"), c.Int("port"))
-	nc, err := net.DialTimeout("tcp", address, 5*time.Second)
+	dialer, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
-		log.Fatalf("Error connecting to VNC host. %v", err)
+		logrus.WithError(err).Error("connection to VNC host failed.")
 		return err
 	}
-	defer nc.Close()
+	defer dialer.Close()
 
-	log.Infof("Connected to %s", address)
+	logrus.WithField("address", address).Info("connection established.")
 
 	// Negotiate connection with the server.
 	cchServer := make(chan vnc.ServerMessage)
@@ -106,7 +106,7 @@ func recorder(c *cli.Context) error {
 		}
 	}
 
-	ccfg := &vnc.ClientConfig{
+	ccflags := &vnc.ClientConfig{
 		SecurityHandlers: secHandlers,
 		DrawCursor:       true,
 		PixelFormat:      vnc.PixelFormat32bit,
@@ -127,30 +127,31 @@ func recorder(c *cli.Context) error {
 		ErrorCh: errorCh,
 	}
 
-	cc, err := vnc.Connect(context.Background(), nc, ccfg)
-	defer cc.Close()
-
-	screenImage := cc.Canvas
+	vncConnection, err := vnc.Connect(context.Background(), dialer, ccflags)
+	defer vncConnection.Close()
 	if err != nil {
-		log.Fatalf("Error negotiating connection to VNC host. %v", err)
+		logrus.WithError(err).Error("connection negotiation to VNC host failed.")
 		return err
 	}
+	screenImage := vncConnection.Canvas
 
-	ffmpeg_path, err := exec.LookPath(c.String("ffmpeg"))
+	ffmpegPath, err := exec.LookPath(c.String("ffmpeg"))
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Error("ffmpeg binary not found.")
+		return err
 	}
-	log.Infof("Using %s for encoding", ffmpeg_path)
+	logrus.WithField("ffmpeg", ffmpegPath).Info("ffmpeg binary for recording found")
+
 	vcodec := &X264ImageCustomEncoder{
-		FFMpegBinPath: ffmpeg_path,
-		Framerate:     c.Int("framerate"),
+		FFMpegBinPath:      ffmpegPath,
+		Framerate:          c.Int("framerate"),
 		ConstantRateFactor: c.Int("crf"),
 	}
 
 	//goland:noinspection GoUnhandledErrorResult
 	go vcodec.Run(c.String("outfile"))
 
-	for _, enc := range ccfg.Encodings {
+	for _, enc := range ccflags.Encodings {
 		myRenderer, ok := enc.(vnc.Renderer)
 
 		if ok {
@@ -158,7 +159,7 @@ func recorder(c *cli.Context) error {
 		}
 	}
 
-	cc.SetEncodings([]vnc.EncodingType{
+	vncConnection.SetEncodings([]vnc.EncodingType{
 		vnc.EncCursorPseudo,
 		vnc.EncPointerPosPseudo,
 		vnc.EncCopyRect,
@@ -201,20 +202,28 @@ func recorder(c *cli.Context) error {
 		case err := <-errorCh:
 			panic(err)
 		case msg := <-cchClient:
-			log.Debugf("Received client message type:%v msg:%v\n", msg.Type(), msg)
+			logrus.WithFields(logrus.Fields{
+				"messageType": msg.Type(),
+				"message":     msg,
+			}).Debug("client message received.")
+
 		case msg := <-cchServer:
 			if msg.Type() == vnc.FramebufferUpdateMsgType {
 				secsPassed := time.Now().Sub(timeStart).Seconds()
 				frameBufferReq++
 				reqPerSec := float64(frameBufferReq) / secsPassed
-				log.Debugf("reqs=%d, seconds=%f, Req Per second= %f", frameBufferReq, secsPassed, reqPerSec)
+				logrus.WithFields(logrus.Fields{
+					"reqs":           frameBufferReq,
+					"seconds":        secsPassed,
+					"Req Per second": reqPerSec,
+				}).Debug("framebuffer update")
 
-				reqMsg := vnc.FramebufferUpdateRequest{Inc: 1, X: 0, Y: 0, Width: cc.Width(), Height: cc.Height()}
-				reqMsg.Write(cc)
+				reqMsg := vnc.FramebufferUpdateRequest{Inc: 1, X: 0, Y: 0, Width: vncConnection.Width(), Height: vncConnection.Height()}
+				reqMsg.Write(vncConnection)
 			}
 		case signal := <-sigCh:
 			if signal != nil {
-				log.Info(signal, " received, exit.")
+				logrus.WithField("signal", signal).Info("signal received.")
 				vcodec.Close()
 				// give some time to write the file
 				time.Sleep(time.Second * 1)

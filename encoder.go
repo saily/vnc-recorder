@@ -10,7 +10,7 @@ import (
 	"fmt"
 	vnc "github.com/amitbet/vnc2video"
 	"github.com/amitbet/vnc2video/encoders"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"image"
 	"image/color"
 	"io"
@@ -107,11 +107,11 @@ func encodePPMforRGBImage(w io.Writer, img *vnc.RGBImage) error {
 
 type X264ImageCustomEncoder struct {
 	encoders.X264ImageEncoder
-	FFMpegBinPath string
-	cmd           *exec.Cmd
-	input         io.WriteCloser
-	closed        bool
-	Framerate     int
+	FFMpegBinPath      string
+	cmd                *exec.Cmd
+	input              io.WriteCloser
+	closed             bool
+	Framerate          int
 	ConstantRateFactor int
 }
 
@@ -137,7 +137,7 @@ func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
 	encInput, err := cmd.StdinPipe()
 	enc.input = encInput
 	if err != nil {
-		log.Error("can't get ffmpeg input pipe")
+		logrus.WithError(err).Error("can't get ffmpeg input pipe.")
 	}
 	enc.cmd = cmd
 }
@@ -147,10 +147,10 @@ func (enc *X264ImageCustomEncoder) Run(videoFileName string) error {
 	}
 
 	enc.Init(videoFileName)
-	log.Infof("launching binary: %v", enc.cmd)
+	logrus.Infof("launching binary: %v", enc.cmd)
 	err := enc.cmd.Run()
 	if err != nil {
-		log.Errorf("error while launching ffmpeg: %v\n err: %v", enc.cmd.Args, err)
+		logrus.WithError(err).Errorf("error while launching ffmpeg: %v", enc.cmd.Args)
 		return err
 	}
 	return nil
@@ -162,7 +162,7 @@ func (enc *X264ImageCustomEncoder) Encode(img image.Image) {
 
 	err := encodePPM(enc.input, img)
 	if err != nil {
-		log.Error("error while encoding image:", err)
+		logrus.WithError(err).Error("error while encoding image.")
 	}
 }
 
@@ -173,7 +173,7 @@ func (enc *X264ImageCustomEncoder) Close() {
 	enc.closed = true
 	err := enc.input.Close()
 	if err != nil {
-		log.Error("could not close input", err)
+		logrus.WithError(err).Error("could not close input.")
 	}
 
 }
