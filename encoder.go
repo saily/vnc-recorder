@@ -123,7 +123,7 @@ func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
 		"-f", "image2pipe",
 		"-vcodec", "ppm",
 		"-r", strconv.Itoa(enc.Framerate),
-		"-an", //no audio
+		"-an", // no audio
 		"-y",
 		"-i", "-",
 		"-vcodec", "libx264",
