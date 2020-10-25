@@ -20,7 +20,7 @@ func main() {
 	app := &cli.App{
 		Name:    path.Base(os.Args[0]),
 		Usage:   "Connect to a vnc server and record the screen to a video.",
-		Version: "1.0",
+		Version: "0.3.0",
 		Authors: []*cli.Author{
 			&cli.Author{
 				Name:  "Daniel Widerin",
