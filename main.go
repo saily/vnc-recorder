@@ -16,11 +16,6 @@ import (
 	"time"
 )
 
-func init() {
-	log.SetOutput(os.Stdout)
-	log.SetLevel(log.InfoLevel)
-}
-
 func main() {
 	app := &cli.App{
 		Name:    path.Base(os.Args[0]),
