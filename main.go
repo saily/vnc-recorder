@@ -5,7 +5,7 @@ import (
 	"fmt"
 	vnc "github.com/amitbet/vnc2video"
 	log "github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 	"net"
 
 	"os"
