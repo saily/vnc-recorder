@@ -18,7 +18,7 @@ library which made this wrapper possible.
        vnc-recorder [global options] command [command options] [arguments...]
 
     VERSION:
-       1.0
+       0.3.0
 
     AUTHOR:
        Daniel Widerin <daniel@widerin.net>
