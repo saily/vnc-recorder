@@ -171,5 +171,9 @@ func (enc *X264ImageCustomEncoder) Close() {
 		return
 	}
 	enc.closed = true
-	enc.input.Close()
+	err := enc.input.Close()
+	if err != nil {
+		log.Error("could not close input", err)
+	}
+
 }
