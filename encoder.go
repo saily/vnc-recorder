@@ -130,6 +130,7 @@ func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
 		"-preset", "veryfast",
 		"-g", "250",
 		"-crf", strconv.Itoa(enc.ConstantRateFactor),
+		"-pix_fmt", "yuv420p",
 		videoFileName,
 	)
 	cmd.Stdout = os.Stdout
