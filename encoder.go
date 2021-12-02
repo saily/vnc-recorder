@@ -130,6 +130,8 @@ func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
 		"-preset", "veryfast",
 		"-g", "250",
 		"-crf", strconv.Itoa(enc.ConstantRateFactor),
+		// https://github.com/saily/vnc-recorder/pull/8
+		"-pix_fmt", "yuv420p",
 		videoFileName,
 	)
 	cmd.Stdout = os.Stdout
