@@ -14,6 +14,7 @@ import (
 	"path"
 	"syscall"
 	"time"
+	"strconv"
 )
 
 func main() {
@@ -67,9 +68,15 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:    "outfile",
-				Value:   "output.mp4",
+				Value:   "output",
 				Usage:   "Output file to record to.",
 				EnvVars: []string{"VR_OUTFILE"},
+			},
+			&cli.IntFlag{
+				Name:    "splitfile",
+				Value:   0,
+				Usage:   "Mins to split file.",
+				EnvVars: []string{"VR_SPLIT_OUTFILE"},
 			},
 		},
 	}
@@ -79,8 +86,8 @@ func main() {
 	}
 }
 
-func recorder(c *cli.Context) error {
-	fmt.Println("PASSWORD", c.String("password"))
+//func vcodecRun(c *cli.Context, vcodec *X264ImageCustomEncoder, ccflags *vnc.ClientConfig, screenImage *vnc.VncCanvas, vncConnection *vnc.ClientConn, errorCh chan error, cchClient chan vnc.ClientMessage, cchServer chan vnc.ServerMessage, outfile string) {
+func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context) error {
 	address := fmt.Sprintf("%s:%d", c.String("host"), c.Int("port"))
 	dialer, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
@@ -143,21 +150,18 @@ func recorder(c *cli.Context) error {
 	}
 	screenImage := vncConnection.Canvas
 
-	ffmpegPath, err := exec.LookPath(c.String("ffmpeg"))
-	if err != nil {
-		logrus.WithError(err).Error("ffmpeg binary not found.")
-		return err
-	}
-	logrus.WithField("ffmpeg", ffmpegPath).Info("ffmpeg binary for recording found")
+	var outfileName string
+	outfile := c.String("outfile")
 
-	vcodec := &X264ImageCustomEncoder{
-		FFMpegBinPath:      ffmpegPath,
-		Framerate:          c.Int("framerate"),
-		ConstantRateFactor: c.Int("crf"),
+	if c.Int("splitfile") > 0 {
+		t := time.Now()
+		outfileName = outfile + "-" + strconv.Itoa(t.Year()) + "-" + strconv.Itoa(int(t.Month())) + "-" + strconv.Itoa(t.Day()) + "-" + strconv.Itoa(t.Hour()) + "-" + strconv.Itoa(t.Minute())
+	} else {
+		outfileName = outfile
 	}
 
 	//goland:noinspection GoUnhandledErrorResult
-	go vcodec.Run(c.String("outfile"))
+	go vcodec.Run(outfileName + ".mp4")
 
 	for _, enc := range ccflags.Encodings {
 		myRenderer, ok := enc.(vnc.Renderer)
@@ -239,5 +243,44 @@ func recorder(c *cli.Context) error {
 			}
 		}
 	}
+}
+
+func recorder(c *cli.Context) error {
+
+	ffmpegPath, err := exec.LookPath(c.String("ffmpeg"))
+	if err != nil {
+		logrus.WithError(err).Error("ffmpeg binary not found.")
+		return err
+	}
+	logrus.WithField("ffmpeg", ffmpegPath).Info("ffmpeg binary for recording found")
+
+	vcodec := &X264ImageCustomEncoder{
+		FFMpegBinPath:      ffmpegPath,
+		Framerate:          c.Int("framerate"),
+		ConstantRateFactor: c.Int("crf"),
+	}
+
+	if c.Int("splitfile") > 0 {
+		ticker := time.NewTicker(time.Duration(c.Int("splitfile")) * time.Minute)
+
+		go vcodecRun(vcodec, c)
+
+		for {
+			select {
+			case _ = <-ticker.C:
+				vcodec.Close()
+				vcodec = &X264ImageCustomEncoder{
+					FFMpegBinPath:      ffmpegPath,
+					Framerate:          c.Int("framerate"),
+					ConstantRateFactor: c.Int("crf"),
+				}
+				go vcodecRun(vcodec, c)
+			}
+		}
+
+	} else {
+		vcodecRun(vcodec, c)
+	}
+
 	return nil
 }

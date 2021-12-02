@@ -9,7 +9,8 @@
 *.test
 
 vnc-recorder
-output.mp4
+*.mp4
+*.s*
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
