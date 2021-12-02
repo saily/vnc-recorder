@@ -20,7 +20,7 @@ func main() {
 	app := &cli.App{
 		Name:    path.Base(os.Args[0]),
 		Usage:   "Connect to a vnc server and record the screen to a video.",
-		Version: "0.3.0",
+		Version: "0.4.2",
 		Authors: []*cli.Author{
 			&cli.Author{
 				Name:  "Daniel Widerin",
@@ -80,6 +80,7 @@ func main() {
 }
 
 func recorder(c *cli.Context) error {
+	fmt.Println("PASSWORD", c.String("password"))
 	address := fmt.Sprintf("%s:%d", c.String("host"), c.Int("port"))
 	dialer, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
@@ -96,13 +97,20 @@ func recorder(c *cli.Context) error {
 	errorCh := make(chan error)
 
 	var secHandlers []vnc.SecurityHandler
-	if c.String("password") == "" {
+
+	var password string
+
+	if c.String("password") != "secret" {
+		password = c.String("password")
+	}
+
+	if password == "" {
 		secHandlers = []vnc.SecurityHandler{
 			&vnc.ClientAuthNone{},
 		}
 	} else {
 		secHandlers = []vnc.SecurityHandler{
-			&vnc.ClientAuthVNC{Password: []byte(c.String("password"))},
+			&vnc.ClientAuthVNC{Password: []byte(password)},
 		}
 	}
 
