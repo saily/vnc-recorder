@@ -15,6 +15,10 @@ import (
 	"syscall"
 	"time"
 	"strconv"
+
+	"errors"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 func main() {
@@ -78,6 +82,42 @@ func main() {
 				Usage:   "Mins to split file.",
 				EnvVars: []string{"VR_SPLIT_OUTFILE"},
 			},
+			&cli.StringFlag{
+				Name:    "s3_endpoint",
+				Value:   "",
+				Usage:   "S3 endpoint.",
+				EnvVars: []string{"VR_S3_ENDPOINT"},
+			},
+			&cli.StringFlag{
+				Name:    "s3_accessKeyID",
+				Value:   "",
+				Usage:   "S3 access key id.",
+				EnvVars: []string{"VR_S3_ACCESSKEY"},
+			},
+			&cli.StringFlag{
+				Name:    "s3_secretAccessKey",
+				Value:   "",
+				Usage:   "S3 secret access key.",
+				EnvVars: []string{"VR_S3_SECRETACCESSKEY"},
+			},
+			&cli.StringFlag{
+				Name:    "s3_bucketName",
+				Value:   "",
+				Usage:   "S3 bucket name.",
+				EnvVars: []string{"VR_S3_BUCKETNAME"},
+			},
+			&cli.StringFlag{
+				Name:    "s3_region",
+				Value:   "us-east-1",
+				Usage:   "S3 region.",
+				EnvVars: []string{"VR_S3_REGION"},
+			},
+			&cli.BoolFlag{
+				Name:    "s3_ssl",
+				Value:   false,
+				Usage:   "S3 SSL.",
+				EnvVars: []string{"VR_S3_SSL"},
+			},
 		},
 	}
 
@@ -87,7 +127,7 @@ func main() {
 }
 
 //func vcodecRun(c *cli.Context, vcodec *X264ImageCustomEncoder, ccflags *vnc.ClientConfig, screenImage *vnc.VncCanvas, vncConnection *vnc.ClientConn, errorCh chan error, cchClient chan vnc.ClientMessage, cchServer chan vnc.ServerMessage, outfile string) {
-func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context) error {
+func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName string) error {
 	address := fmt.Sprintf("%s:%d", c.String("host"), c.Int("port"))
 	dialer, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
@@ -149,16 +189,6 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context) error {
 		return err
 	}
 	screenImage := vncConnection.Canvas
-
-	var outfileName string
-	outfile := c.String("outfile")
-
-	if c.Int("splitfile") > 0 {
-		t := time.Now()
-		outfileName = outfile + "-" + strconv.Itoa(t.Year()) + "-" + strconv.Itoa(int(t.Month())) + "-" + strconv.Itoa(t.Day()) + "-" + strconv.Itoa(t.Hour()) + "-" + strconv.Itoa(t.Minute())
-	} else {
-		outfileName = outfile
-	}
 
 	//goland:noinspection GoUnhandledErrorResult
 	go vcodec.Run(outfileName + ".mp4")
@@ -246,6 +276,17 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context) error {
 }
 
 func recorder(c *cli.Context) error {
+	var minioClient *minio.Client
+
+	var outfileName string
+	outfile := c.String("outfile")
+
+	if c.Int("splitfile") > 0 {
+		t := time.Now()
+		outfileName = outfile + "-" + strconv.Itoa(t.Year()) + "-" + strconv.Itoa(int(t.Month())) + "-" + strconv.Itoa(t.Day()) + "-" + strconv.Itoa(t.Hour()) + "-" + strconv.Itoa(t.Minute())
+	} else {
+		outfileName = outfile
+	}
 
 	ffmpegPath, err := exec.LookPath(c.String("ffmpeg"))
 	if err != nil {
@@ -260,26 +301,78 @@ func recorder(c *cli.Context) error {
 		ConstantRateFactor: c.Int("crf"),
 	}
 
+	if c.String("s3_endpoint") != "" {
+		if c.Int("splitfile") == 0 {
+			return errors.New("If you want to upload videos to S3, you need to split files.")
+		}
+		minioClient, err = minio.New(c.String("s3_endpoint"), &minio.Options{
+			Creds:  credentials.NewStaticV4(c.String("s3_accessKeyID"), c.String("s3_secretAccessKey"), ""),
+			Secure: c.Bool("s3_ssl"),
+		})
+		if err != nil {
+			return err
+		}
+	}
 	if c.Int("splitfile") > 0 {
 		ticker := time.NewTicker(time.Duration(c.Int("splitfile")) * time.Minute)
 
-		go vcodecRun(vcodec, c)
+		go vcodecRun(vcodec, c, outfileName)
 
 		for {
 			select {
 			case _ = <-ticker.C:
 				vcodec.Close()
+				go func(outfileName string) {
+					time.Sleep(10 * time.Second)
+					if c.String("s3_endpoint") != "" {
+						found, err := minioClient.BucketExists(context.Background(), c.String("s3_bucketName"))
+						if err != nil {
+							logrus.Error("minioClient.BucketExists", err)
+							return
+						}
+						if ! found {
+							err = minioClient.MakeBucket(context.Background(), c.String("s3_bucketName"), minio.MakeBucketOptions{Region: c.String("s3_region")})
+							if err != nil {
+								logrus.Error("minioClient.MakeBucket", err)
+								return
+							}
+						}
+						file, err := os.Open(outfileName + ".mp4")
+						if err != nil {
+							logrus.Error("os.Open", err)
+							return
+						}
+						defer file.Close()
+
+						fileStat, err := file.Stat()
+						if err != nil {
+							logrus.Error("fileStat", err)
+							return
+						}
+
+						uploadInfo, err := minioClient.PutObject(context.Background(), c.String("s3_bucketName"), outfileName + ".mp4", file, fileStat.Size(), minio.PutObjectOptions{ContentType:"application/octet-stream"})
+						if err != nil {
+							logrus.Error("minioClient.PutObject", err)
+							return
+						} else {
+							os.Remove(outfileName + ".mp4")
+						}
+						logrus.Debug("Successfully uploaded bytes: ", uploadInfo)
+					}
+				}(outfileName)
+				t := time.Now()
+				outfileName = outfile + "-" + strconv.Itoa(t.Year()) + "-" + strconv.Itoa(int(t.Month())) + "-" + strconv.Itoa(t.Day()) + "-" + strconv.Itoa(t.Hour()) + "-" + strconv.Itoa(t.Minute())
 				vcodec = &X264ImageCustomEncoder{
 					FFMpegBinPath:      ffmpegPath,
 					Framerate:          c.Int("framerate"),
 					ConstantRateFactor: c.Int("crf"),
 				}
-				go vcodecRun(vcodec, c)
+				go vcodecRun(vcodec, c, outfileName)
 			}
 		}
 
 	} else {
-		vcodecRun(vcodec, c)
+		vcodecRun(vcodec, c, outfileName)
 	}
 
 	return nil

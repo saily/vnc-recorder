@@ -8,8 +8,7 @@ library which made this wrapper possible.
 
 ## Use
 
-    docker run -it widerin/vnc-recorder --help
-
+    docker run -it docker run ghcr.io/aluvare/vnc-recorder/vnc-recorder:<release> --help
 
     NAME:
        vnc-recorder - Connect to a vnc server and record the screen to a video.
@@ -48,13 +47,11 @@ you might want to customize the `--ffmpeg` flag to point to an existing
     docker build -t yourbuild .
     docker run -it yourbuild --help
 
-
 ## TODO
 
 - [ ] Add tests!
 - [ ] Add more encoder options
 - [ ] Get some patches merged for our dependencies
-
 
 [ffmpeg]: https://ffmpeg.org
 [docker]: https://www.docker.com
