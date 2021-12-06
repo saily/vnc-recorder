@@ -342,19 +342,21 @@ func recorder(c *cli.Context) error {
 							logrus.Error("os.Open", err)
 							return
 						}
-						defer file.Close()
 
 						fileStat, err := file.Stat()
 						if err != nil {
 							logrus.Error("fileStat", err)
+							file.Close()
 							return
 						}
 
 						uploadInfo, err := minioClient.PutObject(context.Background(), c.String("s3_bucketName"), outfileName + ".mp4", file, fileStat.Size(), minio.PutObjectOptions{ContentType:"application/octet-stream"})
 						if err != nil {
 							logrus.Error("minioClient.PutObject", err)
+							file.Close()
 							return
 						} else {
+							file.Close()
 							os.Remove(outfileName + ".mp4")
 						}
 						logrus.Debug("Successfully uploaded bytes: ", uploadInfo)
