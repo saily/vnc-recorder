@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 	"strconv"
+	"strings"
 
 	"errors"
 	"github.com/minio/minio-go/v7"
@@ -252,16 +253,23 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 	for {
 		select {
 		case err := <-errorCh:
-			panic(err)
+			if strings.Contains(err.Error(), "EOF") {
+				logrus.WithField("error", err).Error("Received EOF, maybe a resolution change.")
+				vcodec.Close()
+				videoUpload(c, outfileName)
+				panic(err)
+			} else {
+				panic(err)
+			}
 		case err := <-errorCh2:
 			logrus.WithField("error", err).Error("Encoded error received.")
 			vcodec.Close()
+			videoUpload(c, outfileName)
 		case msg := <-cchClient:
 			logrus.WithFields(logrus.Fields{
 				"messageType": msg.Type(),
 				"message":     msg,
 			}).Debug("client message received.")
-
 		case msg := <-cchServer:
 			if msg.Type() == vnc.FramebufferUpdateMsgType {
 				secsPassed := time.Now().Sub(timeStart).Seconds()
@@ -284,6 +292,62 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 			}
 		}
 	}
+}
+
+func videoUpload(c *cli.Context, outfileName string) error {
+	var minioClient *minio.Client
+	var err error
+	if c.String("s3_endpoint") != "" {
+		if c.Int("splitfile") == 0 {
+			return errors.New("If you want to upload videos to S3, you need to split files.")
+		}
+		minioClient, err = minio.New(c.String("s3_endpoint"), &minio.Options{
+			Creds:  credentials.NewStaticV4(c.String("s3_accessKeyID"), c.String("s3_secretAccessKey"), ""),
+			Secure: c.Bool("s3_ssl"),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	time.Sleep(10 * time.Second)
+	if c.String("s3_endpoint") != "" {
+		found, err := minioClient.BucketExists(context.Background(), c.String("s3_bucketName"))
+		if err != nil {
+			logrus.Error("minioClient.BucketExists", err)
+			return err
+		}
+		if ! found {
+			err = minioClient.MakeBucket(context.Background(), c.String("s3_bucketName"), minio.MakeBucketOptions{Region: c.String("s3_region")})
+			if err != nil {
+				logrus.Error("minioClient.MakeBucket", err)
+				return err
+			}
+		}
+		file, err := os.Open(outfileName + ".mp4")
+		if err != nil {
+			logrus.Error("os.Open", err)
+			return err
+		}
+
+		fileStat, err := file.Stat()
+		if err != nil {
+			logrus.Error("fileStat", err)
+			file.Close()
+			return err
+		}
+
+		uploadInfo, err := minioClient.PutObject(context.Background(), c.String("s3_bucketName"), outfileName + ".mp4", file, fileStat.Size(), minio.PutObjectOptions{ContentType:"application/octet-stream"})
+		if err != nil {
+			logrus.Error("minioClient.PutObject", err)
+			file.Close()
+			return err
+		} else {
+			file.Close()
+			os.Remove(outfileName + ".mp4")
+		}
+		logrus.Debug("Successfully uploaded bytes: ", uploadInfo)
+	}
+	return nil
 }
 
 func recorder(c *cli.Context) error {
