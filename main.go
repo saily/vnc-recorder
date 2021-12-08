@@ -147,6 +147,7 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 	cchServer := make(chan vnc.ServerMessage)
 	cchClient := make(chan vnc.ClientMessage)
 	errorCh := make(chan error)
+	errorCh2 := make(chan error)
 
 	var secHandlers []vnc.SecurityHandler
 
@@ -221,7 +222,11 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 		for {
 			timeStart := time.Now()
 
-			vcodec.Encode(screenImage.Image)
+			err := vcodec.Encode(screenImage.Image)
+			if err != nil {
+				errorCh2<-err
+				return
+			}
 
 			timeTarget := timeStart.Add((1000 / time.Duration(vcodec.Framerate)) * time.Millisecond)
 			timeLeft := timeTarget.Sub(time.Now())
@@ -248,6 +253,9 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 		select {
 		case err := <-errorCh:
 			panic(err)
+		case err := <-errorCh2:
+			logrus.WithField("error", err).Error("Encoded error received.")
+			vcodec.Close()
 		case msg := <-cchClient:
 			logrus.WithFields(logrus.Fields{
 				"messageType": msg.Type(),
@@ -272,8 +280,6 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 			if signal != nil {
 				logrus.WithField("signal", signal).Info("signal received.")
 				vcodec.Close()
-				// give some time to write the file
-				time.Sleep(time.Second * 1)
 				os.Exit(0)
 			}
 		}
@@ -325,8 +331,11 @@ func recorder(c *cli.Context) error {
 	if c.Int("splitfile") > 0 {
 		ticker := time.NewTicker(time.Duration(c.Int("splitfile")) * time.Minute)
 
-		go vcodecRun(vcodec, c, outfileName)
-
+		go func() {
+			for {
+				vcodecRun(vcodec, c, outfileName)
+			}
+		}()
 		for {
 			select {
 			case _ = <-ticker.C:
