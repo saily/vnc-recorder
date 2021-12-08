@@ -118,9 +118,14 @@ func main() {
 				Usage:   "S3 SSL.",
 				EnvVars: []string{"VR_S3_SSL"},
 			},
+			&cli.BoolFlag{
+				Name:    "debug",
+				Value:   false,
+				Usage:   "Debug.",
+				EnvVars: []string{"VR_DEBUG"},
+			},
 		},
 	}
-
 	if err := app.Run(os.Args); err != nil {
 		logrus.WithError(err).Fatal("recording failed.")
 	}
@@ -276,6 +281,10 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 }
 
 func recorder(c *cli.Context) error {
+	if c.Bool("debug") {
+		logrus.SetReportCaller(true)
+	}
+
 	var minioClient *minio.Client
 
 	var outfileName string
