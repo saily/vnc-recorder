@@ -1,0 +1,33 @@
+name: Publish Docker image
+on:
+  release:
+    types: [published]
+jobs:
+  push_to_registry:
+    name: Push Docker image to GitHub Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+          lfs: true
+      - name: Checkout LFS objects
+        run: git lfs checkout
+      - name: Docker meta
+        id: docker_meta
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: ghcr.io/aluvare/vnc-recorder/vnc-recorder
+          tag-sha: true
+          tag-semver: |
+            {{major}}.{{minor}}s
+      - name: Push to GitHub Packages
+        uses: docker/build-push-action@v1
+        with:
+          path: .
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          repository: aluvare/vnc-recorder/vnc-recorder
+          tag_with_ref: true

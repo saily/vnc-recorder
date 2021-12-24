@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"time"
 )
 
 func encodePPMforRGBA(w io.Writer, img *image.RGBA) error {
@@ -126,10 +127,13 @@ func (enc *X264ImageCustomEncoder) Init(videoFileName string) {
 		"-an", // no audio
 		"-y",
 		"-i", "-",
+		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
 		"-vcodec", "libx264",
 		"-preset", "veryfast",
 		"-g", "250",
 		"-crf", strconv.Itoa(enc.ConstantRateFactor),
+		// https://github.com/saily/vnc-recorder/pull/8
+		"-pix_fmt", "yuv420p",
 		videoFileName,
 	)
 	cmd.Stdout = os.Stdout
@@ -155,15 +159,17 @@ func (enc *X264ImageCustomEncoder) Run(videoFileName string) error {
 	}
 	return nil
 }
-func (enc *X264ImageCustomEncoder) Encode(img image.Image) {
+func (enc *X264ImageCustomEncoder) Encode(img image.Image) error {
 	if enc.input == nil || enc.closed {
-		return
+		return nil
 	}
 
 	err := encodePPM(enc.input, img)
 	if err != nil {
 		logrus.WithError(err).Error("error while encoding image.")
+		return err
 	}
+	return nil
 }
 
 func (enc *X264ImageCustomEncoder) Close() {
@@ -175,5 +181,6 @@ func (enc *X264ImageCustomEncoder) Close() {
 	if err != nil {
 		logrus.WithError(err).Error("could not close input.")
 	}
+	time.Sleep(2 * time.Second)
 
 }
