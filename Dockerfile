@@ -1,5 +1,4 @@
-FROM golang:alpine as build-env
-LABEL maintainer="daniel@widerin.net"
+FROM golang:1.20rc1-bullseye as build-env
 
 ENV GO111MODULE=on
 RUN apk --no-cache add git
@@ -9,7 +8,7 @@ WORKDIR /app
 
 RUN ls -lahR && go mod download && go build -o /vnc-recorder
 
-FROM jrottenberg/ffmpeg:4.1-alpine
+FROM linuxserver/ffmpeg:version-4.4-cli
 COPY --from=build-env /vnc-recorder /
 ENTRYPOINT ["/vnc-recorder"]
 CMD [""]
