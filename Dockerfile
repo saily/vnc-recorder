@@ -1,7 +1,6 @@
 FROM golang:1.20rc1-bullseye as build-env
 
 ENV GO111MODULE=on
-RUN apk --no-cache add git
 
 COPY . /app
 WORKDIR /app
