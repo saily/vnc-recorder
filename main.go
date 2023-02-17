@@ -422,7 +422,7 @@ func recorder(c *cli.Context) error {
 				go func(outfileName string) {
 					time.Sleep(10 * time.Second)
 					if c.String("s3_endpoint") != "" {
-						found, err := minioClient.BucketExists(context.Background(), procBucketName(c.String("s3_bucketName"))i)
+						found, err := minioClient.BucketExists(context.Background(), procBucketName(c.String("s3_bucketName")))
 						if err != nil {
 							logrus.Error("minioClient.BucketExists", err)
 							return
