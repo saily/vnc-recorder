@@ -294,6 +294,21 @@ func vcodecRun(vcodec *X264ImageCustomEncoder, c *cli.Context, outfileName strin
 	}
 }
 
+func procBucketName(s string) string {
+	// Get the current year, month, and day.
+	now := time.Now()
+	year := now.Year()
+	month := int(now.Month())
+	day := now.Day()
+
+	// Replace {YEAR}, {MONTH}, and {DAY} placeholders in the string with the corresponding values.
+	s = strings.ReplaceAll(s, "{YEAR}", fmt.Sprintf("%d", year))
+	s = strings.ReplaceAll(s, "{MONTH}", fmt.Sprintf("%02d", month))
+	s = strings.ReplaceAll(s, "{DAY}", fmt.Sprintf("%02d", day))
+
+	return s
+}
+
 func videoUpload(c *cli.Context, outfileName string) error {
 	var minioClient *minio.Client
 	var err error
@@ -311,13 +326,13 @@ func videoUpload(c *cli.Context, outfileName string) error {
 	}
 	time.Sleep(10 * time.Second)
 	if c.String("s3_endpoint") != "" {
-		found, err := minioClient.BucketExists(context.Background(), c.String("s3_bucketName"))
+		found, err := minioClient.BucketExists(context.Background(), procBucketName(c.String("s3_bucketName")))
 		if err != nil {
 			logrus.Error("minioClient.BucketExists", err)
 			return err
 		}
 		if ! found {
-			err = minioClient.MakeBucket(context.Background(), c.String("s3_bucketName"), minio.MakeBucketOptions{Region: c.String("s3_region")})
+			err = minioClient.MakeBucket(context.Background(), procBucketName(c.String("s3_bucketName")), minio.MakeBucketOptions{Region: c.String("s3_region")})
 			if err != nil {
 				logrus.Error("minioClient.MakeBucket", err)
 				return err
@@ -336,7 +351,7 @@ func videoUpload(c *cli.Context, outfileName string) error {
 			return err
 		}
 
-		uploadInfo, err := minioClient.PutObject(context.Background(), c.String("s3_bucketName"), outfileName + ".mp4", file, fileStat.Size(), minio.PutObjectOptions{ContentType:"application/octet-stream"})
+		uploadInfo, err := minioClient.PutObject(context.Background(), procBucketName(c.String("s3_bucketName")), outfileName + ".mp4", file, fileStat.Size(), minio.PutObjectOptions{ContentType:"application/octet-stream"})
 		if err != nil {
 			logrus.Error("minioClient.PutObject", err)
 			file.Close()
@@ -407,13 +422,13 @@ func recorder(c *cli.Context) error {
 				go func(outfileName string) {
 					time.Sleep(10 * time.Second)
 					if c.String("s3_endpoint") != "" {
-						found, err := minioClient.BucketExists(context.Background(), c.String("s3_bucketName"))
+						found, err := minioClient.BucketExists(context.Background(), procBucketName(c.String("s3_bucketName"))i)
 						if err != nil {
 							logrus.Error("minioClient.BucketExists", err)
 							return
 						}
 						if ! found {
-							err = minioClient.MakeBucket(context.Background(), c.String("s3_bucketName"), minio.MakeBucketOptions{Region: c.String("s3_region")})
+							err = minioClient.MakeBucket(context.Background(), procBucketName(c.String("s3_bucketName")), minio.MakeBucketOptions{Region: c.String("s3_region")})
 							if err != nil {
 								logrus.Error("minioClient.MakeBucket", err)
 								return
@@ -432,7 +447,7 @@ func recorder(c *cli.Context) error {
 							return
 						}
 
-						uploadInfo, err := minioClient.PutObject(context.Background(), c.String("s3_bucketName"), outfileName + ".mp4", file, fileStat.Size(), minio.PutObjectOptions{ContentType:"application/octet-stream"})
+						uploadInfo, err := minioClient.PutObject(context.Background(), procBucketName(c.String("s3_bucketName")), outfileName + ".mp4", file, fileStat.Size(), minio.PutObjectOptions{ContentType:"application/octet-stream"})
 						if err != nil {
 							logrus.Error("minioClient.PutObject", err)
 							file.Close()
